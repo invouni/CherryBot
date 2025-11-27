@@ -21,22 +21,23 @@
   <!-- ==============================
        Chat Box / Text Interaction
        ============================== -->
-  <div class="speak rounded-md bg-black flex flex-col items-center flex-1 px-4 relative">
+  <div class="rounded-md bg-black flex flex-col items-center flex-1 px-4 relative max-h-[50%]">
     
     <!-- Chat messages container -->
-    <div class="container h-[80%] w-full overflow-scroll p-2 flex flex-col gap-1">
+    <div class="container h-[80%] w-overflow-y-scroll overflow-x-hidden flex flex flex-col gap-1">
       <!-- Dynamic chat messages will be appended here -->
     </div>
     
     <!-- Input area for user -->
-    <div class="typer w-[98%] mx-auto flex gap-1 absolute bottom-[0.5rem]">
-      <input type="text" class="flex-1 px-2 py-3 text-black outline-0 bg-white rounded-full" placeholder="Type a message..." />
-      <button type="submit" class="rounded-full w-[3rem] aspect-square bg-white flex items-center justify-center">
+    <div class="typer w-[95%] mx-auto flex gap-1 absolute bottom-[0.5rem]">
+      <input type="text" class="input-text flex-1 px-2 text-lg rounded-md text-black outline-0 bg-wrounded-full-full" placeholder="Type a message..." />
+      <button type="submit" class="send-btn rounded-full w-[3rem] aspect-square bg-white flex items-center justify-center">
         <img class="w-[50%]" src="/assets/send.svg" alt="Send" />
       </button>
     </div>
     
-    <!-- Voice feedback / speaking indicator could go here -->
+    <!-- Voice feedback / speaindicatorcator could go here -->
+    
   </div>
   
   <!-- ==============================
@@ -51,7 +52,13 @@
     <button id="startBtn" class="bg-blue-600 text-white p-2 rounded active:opacity-[0.8]">
       Start Cherry
     </button>
+
+    <!--this is route to /index -->
+  <a class="my-2 mx-auto text-white hove:text:white" href="/">
+    <button class="bg-[#D2042D] py-2 px-3 text-white rounded-md">View Timetable</button>
+  </a>
   </div>
+
   
   <!-- ==============================
        Libraries & Scripts

@@ -1,23 +1,25 @@
+let textInp = document.getElementsByClassName("input-text")[0];
+let sendBtn = document.getElementsByClassName("send-btn")[0];
 
 function appendMessage(text, user) {
-  const container = document.querySelector('.container');
+  const container = document.querySelector(".container");
 
   // Create main box div
-  const box = document.createElement('div');
+  const box = document.createElement("div");
   box.className = `
     box w-[95%] mx-auto h-auto py-2 px-3 flex flex-col rounded-md my-[0.3rem]
-    ${user === 'ai' ? 'bg-[#FFFAF5]' : 'bg-[#DCF8C6]'}
+    ${user === "ai" ? "bg-[#FFFAF5]" : "bg-[#DCF8C6]"}
   `.trim();
 
   // Strong element for user icon
-  const strong = document.createElement('strong');
-  strong.className = 'text-black';
-  strong.textContent = user === 'ai' ? '🤖' : '🧑‍💻';
+  const strong = document.createElement("strong");
+  strong.className = "text-black";
+  strong.textContent = user === "ai" ? "🤖" : "🧑‍💻";
   box.appendChild(strong);
 
   // Paragraph for message text
-  const p = document.createElement('p');
-  p.className = 'text-light';
+  const p = document.createElement("p");
+  p.className = "text-light";
   p.innerHTML = text;
   box.appendChild(p);
 
@@ -85,7 +87,17 @@ if (!("webkitSpeechRecognition" in window)) {
       console.error("Error sending question:", err);
     }
   }
+  sendBtn.addEventListener("click", () => {
+    let text = textInp.value.trim();
 
+    if (!text) {
+      return;
+    }
+
+    appendMessage(text, "human");
+    sendQuestion(text);
+    textInp.value = "";
+  });
   // Simple TTS
   function speak(text) {
     const utterance = new SpeechSynthesisUtterance(text);

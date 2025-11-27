@@ -1,6 +1,6 @@
 entrypoint = "main.sh"
 modules = ["bash", "nodejs-20"]
-
+run = "node server"
 [nix]
 channel = "stable-24_05"
 
