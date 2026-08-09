@@ -1,858 +1,446 @@
-const textInp = document.getElementsByClassName("input-text")[0];
-const sendBtn = document.getElementsByClassName("send-btn")[0];
+<!DOCTYPE html>
+<html lang="en">
 
-const startBtn = document.getElementById("startBtn");
-const voiceStatus = document.getElementById("voiceStatus");
-const voiceStatusText = document.getElementById("voiceStatusText");
+<head>
 
-let rec = null;
+    <meta charset="UTF-8">
 
-let isListening = false;
-let isProcessing = false;
-let shouldListen = false;
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-let silenceTimer = null;
-let finalTranscript = "";
+    <script src="https://cdn.tailwindcss.com"></script>
 
-const SILENCE_TIMEOUT = 1500;
+    <title>Cherry — Voice Assistant</title>
 
 
-// ============================================================
-// VOICE STATE
-// ============================================================
+    <style>
 
-function setVoiceState(state, message) {
-
-    if (voiceStatus) {
-        voiceStatus.dataset.state = state;
-    }
-
-    if (voiceStatusText) {
-        voiceStatusText.textContent = message;
-    }
-
-    if (!startBtn) return;
-
-    startBtn.classList.remove(
-        "bg-blue-600",
-        "bg-red-600",
-        "bg-yellow-500",
-        "bg-purple-600"
-    );
-
-    if (state === "listening") {
-
-        startBtn.textContent = "Stop Cherry";
-        startBtn.classList.add("bg-red-600");
-
-    } else if (state === "processing") {
-
-        startBtn.textContent = "Thinking...";
-        startBtn.classList.add("bg-yellow-500");
-
-    } else if (state === "speaking") {
-
-        startBtn.textContent = "Speaking...";
-        startBtn.classList.add("bg-purple-600");
-
-    } else {
-
-        startBtn.textContent = "Start Cherry";
-        startBtn.classList.add("bg-blue-600");
-    }
-}
+        body {
+            margin: 0;
+        }
 
 
-// ============================================================
-// ADD MESSAGE TO CHAT BOARD
-// ============================================================
+        /* ==========================
+           CHERRY VOICE RING
+        ========================== */
 
-function appendMessage(text, user) {
+        .voice-ring {
 
-    const container =
-        document.querySelector(".container");
+            transition:
+                transform 300ms ease,
+                opacity 300ms ease,
+                box-shadow 300ms ease;
+        }
 
-    if (!container) return;
 
-    const box =
-        document.createElement("div");
+        /* LISTENING */
 
-    box.className = `
-        box
-        w-[95%]
-        mx-auto
-        h-auto
-        py-2
-        px-3
+        [data-state="listening"] .voice-ring {
+
+            transform: scale(1.06);
+
+            box-shadow:
+                0 0 0 10px rgba(37, 99, 235, 0.08),
+                0 0 35px rgba(37, 99, 235, 0.35);
+        }
+
+
+        /* THINKING */
+
+        [data-state="processing"] .voice-ring {
+
+            box-shadow:
+                0 0 0 10px rgba(234, 179, 8, 0.08),
+                0 0 35px rgba(234, 179, 8, 0.35);
+        }
+
+
+        /* SPEAKING */
+
+        [data-state="speaking"] .voice-ring {
+
+            transform: scale(1.1);
+
+            box-shadow:
+                0 0 0 10px rgba(147, 51, 234, 0.08),
+                0 0 40px rgba(147, 51, 234, 0.4);
+        }
+
+
+        /* ==========================
+           STATUS DOT
+        ========================== */
+
+        .status-dot {
+
+            width: 8px;
+            height: 8px;
+
+            border-radius: 50%;
+
+            background: #9ca3af;
+
+            transition:
+                background 300ms ease,
+                box-shadow 300ms ease;
+        }
+
+
+        [data-state="listening"] .status-dot {
+
+            background: #2563eb;
+
+            box-shadow:
+                0 0 12px #2563eb;
+        }
+
+
+        [data-state="processing"] .status-dot {
+
+            background: #eab308;
+
+            box-shadow:
+                0 0 12px #eab308;
+        }
+
+
+        [data-state="speaking"] .status-dot {
+
+            background: #9333ea;
+
+            box-shadow:
+                0 0 12px #9333ea;
+        }
+
+
+        /* ==========================
+           STATUS TEXT
+        ========================== */
+
+        #voiceStatusText {
+
+            transition:
+                color 300ms ease;
+        }
+
+
+        [data-state="listening"]
+        #voiceStatusText {
+
+            color: #2563eb;
+        }
+
+
+        [data-state="processing"]
+        #voiceStatusText {
+
+            color: #ca8a04;
+        }
+
+
+        [data-state="speaking"]
+        #voiceStatusText {
+
+            color: #9333ea;
+        }
+
+    </style>
+
+</head>
+
+
+<body
+    class="
+        bg-gray-200
+        w-full
+        min-h-screen
         flex
         flex-col
-        rounded-md
-        my-[0.3rem]
-        ${user === "ai"
-            ? "bg-[#FFFAF5]"
-            : "bg-[#DCF8C6]"
-        }
-    `;
-
-    const strong =
-        document.createElement("strong");
-
-    strong.className =
-        "text-black";
-
-    strong.textContent =
-        user === "ai"
-            ? "Cherry"
-            : "You";
-
-    box.appendChild(strong);
-
-    const p =
-        document.createElement("p");
-
-    p.className =
-        "text-black";
-
-    if (user === "ai") {
-
-        if (
-            typeof marked !== "undefined"
-        ) {
-
-            p.innerHTML =
-                marked.parse(text);
-
-        } else {
-
-            p.textContent =
-                text;
-        }
-
-    } else {
-
-        p.textContent =
-            text;
-    }
-
-    box.appendChild(p);
-
-    container.appendChild(box);
-
-    container.scrollTop =
-        container.scrollHeight;
-}
-
-
-// ============================================================
-// SILENCE TIMER
-// ============================================================
-
-function clearSilenceTimer() {
-
-    if (silenceTimer) {
-
-        clearTimeout(silenceTimer);
-
-        silenceTimer = null;
-    }
-}
-
-
-function startSilenceTimer() {
-
-    clearSilenceTimer();
-
-    silenceTimer =
-        setTimeout(() => {
-
-            if (
-                finalTranscript.trim() &&
-                !isProcessing
-            ) {
-
-                submitSpeech();
-            }
-
-        }, SILENCE_TIMEOUT);
-}
-
-
-// ============================================================
-// SUBMIT SPEECH
-// ============================================================
-
-function submitSpeech() {
-
-    clearSilenceTimer();
-
-    const question =
-        finalTranscript.trim();
-
-    finalTranscript = "";
-
-    if (!question) return;
-
-    // Immediately show user's speech
-    // on the chat board.
-
-    appendMessage(
-        question,
-        "human"
-    );
-
-    sendQuestion(
-        question
-    );
-}
-
-
-// ============================================================
-// SPEECH RECOGNITION
-// ============================================================
-
-function createRecognition() {
-
-    if (
-        !("webkitSpeechRecognition" in window)
-    ) {
-
-        setVoiceState(
-            "idle",
-            "Speech recognition is not supported"
-        );
-
-        return null;
-    }
-
-    const recognition =
-        new webkitSpeechRecognition();
-
-    recognition.continuous = true;
-
-    recognition.interimResults = true;
-
-    recognition.lang = "en-US";
-
-    recognition.maxAlternatives = 1;
-
-
-    // --------------------------------------------------------
-    // START
-    // --------------------------------------------------------
-
-    recognition.onstart = () => {
-
-        isListening = true;
-
-        setVoiceState(
-            "listening",
-            "Listening..."
-        );
-    };
-
-
-    // --------------------------------------------------------
-    // SPEECH START
-    // --------------------------------------------------------
-
-    recognition.onspeechstart = () => {
-
-        clearSilenceTimer();
-    };
-
-
-    // --------------------------------------------------------
-    // SPEECH END
-    // --------------------------------------------------------
-
-    recognition.onspeechend = () => {
-
-        startSilenceTimer();
-    };
-
-
-    // --------------------------------------------------------
-    // RESULT
-    // --------------------------------------------------------
-
-    recognition.onresult =
-        (event) => {
-
-        let interimTranscript = "";
-
-
-        for (
-            let i = event.resultIndex;
-            i < event.results.length;
-            i++
-        ) {
-
-            const result =
-                event.results[i];
-
-            const transcript =
-                result[0]
-                    .transcript
-                    .trim();
-
-
-            if (result.isFinal) {
-
-                finalTranscript +=
-                    transcript + " ";
-
-            } else {
-
-                interimTranscript +=
-                    transcript + " ";
-            }
-        }
-
-
-        // Show live speech.
-
-        if (
-            interimTranscript &&
-            voiceStatusText
-        ) {
-
-            voiceStatusText.textContent =
-                `Listening: ${interimTranscript.trim()}`;
-        }
-
-
-        /*
-         * Any speech resets the silence timer.
-         * Once final speech is received, the timer
-         * starts counting down.
-         */
-
-        if (
-            interimTranscript.trim()
-        ) {
-
-            clearSilenceTimer();
-        }
-
-
-        if (
-            finalTranscript.trim()
-        ) {
-
-            startSilenceTimer();
-        }
-    };
-
-
-    // --------------------------------------------------------
-    // ERROR
-    // --------------------------------------------------------
-
-    recognition.onerror =
-        (event) => {
-
-        if (
-            event.error === "not-allowed" ||
-            event.error === "service-not-allowed"
-        ) {
-
-            shouldListen = false;
-            isListening = false;
-
-            clearSilenceTimer();
-
-            setVoiceState(
-                "idle",
-                "Microphone permission denied"
-            );
-
-            return;
-        }
-
-
-        if (
-            event.error === "audio-capture"
-        ) {
-
-            shouldListen = false;
-            isListening = false;
-
-            clearSilenceTimer();
-
-            setVoiceState(
-                "idle",
-                "Microphone unavailable"
-            );
-
-            return;
-        }
-
-
-        if (
-            event.error === "network"
-        ) {
-
-            shouldListen = false;
-            isListening = false;
-
-            clearSilenceTimer();
-
-            setVoiceState(
-                "idle",
-                "Speech service unavailable"
-            );
-
-            return;
-        }
-
-
-        if (
-            event.error === "no-speech"
-        ) {
-
-            setVoiceState(
-                "listening",
-                "Listening..."
-            );
-        }
-    };
-
-
-    // --------------------------------------------------------
-    // END
-    // --------------------------------------------------------
-
-    recognition.onend =
-        () => {
-
-        isListening = false;
-
-
-        /*
-         * If speech was already captured,
-         * send it instead of restarting recognition.
-         */
-
-        if (
-            finalTranscript.trim() &&
-            !isProcessing
-        ) {
-
-            submitSpeech();
-
-            return;
-        }
-
-
-        /*
-         * Chrome can stop recognition automatically.
-         * Restart while Cherry is active.
-         */
-
-        if (
-            shouldListen &&
-            !isProcessing &&
-            !speechSynthesis.speaking
-        ) {
-
-            setTimeout(() => {
-
-                if (
-                    !shouldListen ||
-                    isListening
-                ) {
-                    return;
-                }
-
-                try {
-
-                    recognition.start();
-
-                } catch (error) {
-
-                    // Ignore repeated start errors.
-                }
-
-            }, 300);
-
-            return;
-        }
-
-
-        if (
-            !isProcessing &&
-            !speechSynthesis.speaking
-        ) {
-
-            setVoiceState(
-                "idle",
-                "Click Start Cherry to speak"
-            );
-        }
-    };
-
-
-    return recognition;
-}
-
-
-// ============================================================
-// START / STOP CHERRY
-// ============================================================
-
-if (
-    !("webkitSpeechRecognition" in window)
-) {
-
-    setVoiceState(
-        "idle",
-        "Speech recognition is not supported"
-    );
-
-    if (startBtn) {
-        startBtn.disabled = true;
-    }
-
-} else {
-
-    startBtn.onclick =
-        async () => {
-
-        // ====================================================
-        // STOP
-        // ====================================================
-
-        if (
-            shouldListen ||
-            isListening
-        ) {
-
-            shouldListen = false;
-            isListening = false;
-
-            clearSilenceTimer();
-
-            if (rec) {
-
-                try {
-                    rec.stop();
-                } catch (error) {
-                    // Ignore stop errors.
-                }
-            }
-
-            speechSynthesis.cancel();
-
-            finalTranscript = "";
-
-            setVoiceState(
-                "idle",
-                "Click Start Cherry to speak"
-            );
-
-            return;
-        }
-
-
-        // ====================================================
-        // START
-        // ====================================================
-
-        try {
-
-            /*
-             * Request microphone permission.
-             *
-             * Chrome will use the microphone selected
-             * for the current browser/system.
-             */
-
-            const stream =
-                await navigator
-                    .mediaDevices
-                    .getUserMedia({
-                        audio: true
-                    });
-
-
-            /*
-             * This stream is only used to request/check
-             * microphone permission.
-             */
-
-            stream
-                .getTracks()
-                .forEach(
-                    track => track.stop()
-                );
-
-
-            rec =
-                createRecognition();
-
-            if (!rec) return;
-
-            shouldListen = true;
-
-            finalTranscript = "";
-
-            rec.start();
-
-        } catch (error) {
-
-            shouldListen = false;
-            isListening = false;
-
-            setVoiceState(
-                "idle",
-                "Could not access microphone"
-            );
-        }
-    };
-}
-
-
-// ============================================================
-// SEND QUESTION TO SERVER
-// ============================================================
-
-async function sendQuestion(question) {
-
-    if (
-        !question ||
-        isProcessing
-    ) {
-        return;
-    }
-
-    isProcessing = true;
-
-    setVoiceState(
-        "processing",
-        "Thinking..."
-    );
-
-
-    try {
-
-        const response =
-            await fetch(
-                "/ques",
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-
-                    body:
-                        JSON.stringify({
-                            question
-                        })
-                }
-            );
-
-
-        if (!response.ok) {
-
-            const errorText =
-                await response.text();
-
-            throw new Error(
-                `HTTP ${response.status}: ${errorText}`
-            );
-        }
-
-
-        const result =
-            await response.json();
-
-
-        /*
-         * Your server currently returns:
-         *
-         * {
-         *     responce: response.text
-         * }
-         */
-
-        const answer =
-            result.responce ||
-            result.response;
-
-
-        if (!answer) {
-
-            throw new Error(
-                "No response received from server"
-            );
-        }
-
-
-        // Show Cherry's answer.
-
-        appendMessage(
-            answer,
-            "ai"
-        );
-
-
-        // Speak Cherry's answer.
-
-        speak(answer);
-
-    } catch (error) {
-
-        appendMessage(
-            "Sorry, I couldn't get a response.",
-            "ai"
-        );
-
-        setVoiceState(
-            "idle",
-            "Something went wrong"
-        );
-
-    } finally {
-
-        isProcessing = false;
-    }
-}
-
-
-// ============================================================
-// TEXT INPUT
-// ============================================================
-
-sendBtn.addEventListener(
-    "click",
-    () => {
-
-        const text =
-            textInp.value.trim();
-
-        if (
-            !text ||
-            isProcessing
-        ) {
-            return;
-        }
-
-        appendMessage(
-            text,
-            "human"
-        );
-
-        textInp.value = "";
-
-        sendQuestion(
-            text
-        );
-    }
-);
-
-
-// ============================================================
-// ENTER TO SEND
-// ============================================================
-
-textInp.addEventListener(
-    "keydown",
-    (event) => {
-
-        if (
-            event.key === "Enter"
-        ) {
-
-            event.preventDefault();
-
-            sendBtn.click();
-        }
-    }
-);
-
-
-// ============================================================
-// TEXT TO SPEECH
-// ============================================================
-
-function speak(text) {
-
-    speechSynthesis.cancel();
-
-
-    const utterance =
-        new SpeechSynthesisUtterance(
-            text
-        );
-
-
-    utterance.lang =
-        "en-US";
-
-    utterance.rate =
-        1;
-
-    utterance.pitch =
-        1;
-
-
-    utterance.onstart =
-        () => {
-
-        setVoiceState(
-            "speaking",
-            "Speaking..."
-        );
-    };
-
-
-    utterance.onend =
-        () => {
-
-        if (
-            shouldListen
-        ) {
-
-            setVoiceState(
-                "listening",
-                "Listening..."
-            );
-
-        } else {
-
-            setVoiceState(
-                "idle",
-                "Click Start Cherry to speak"
-            );
-        }
-    };
-
-
-    utterance.onerror =
-        () => {
-
-        if (
-            shouldListen
-        ) {
-
-            setVoiceState(
-                "listening",
-                "Listening..."
-            );
-
-        } else {
-
-            setVoiceState(
-                "idle",
-                "Click Start Cherry to speak"
-            );
-        }
-    };
-
-
-    speechSynthesis.speak(
-        utterance
-    );
-}
+        lg:flex-row
+        gap-2
+        p-2
+    "
+>
+
+
+    <!-- =====================================
+         CHAT
+    ====================================== -->
+
+    <div
+        class="
+            rounded-md
+            bg-black
+            flex
+            flex-col
+            items-center
+            flex-1
+            px-4
+            relative
+            min-h-[50vh]
+            lg:min-h-0
+        "
+    >
+
+        <div
+            class="
+                container
+                h-full
+                w-full
+                overflow-y-auto
+                overflow-x-hidden
+                flex
+                flex-col
+                gap-1
+                pb-20
+            "
+        >
+
+            <!-- Messages appear here -->
+
+        </div>
+
+
+        <!-- INPUT -->
+
+        <div
+            class="
+                typer
+                w-[95%]
+                mx-auto
+                flex
+                gap-2
+                absolute
+                bottom-2
+            "
+        >
+
+            <input
+                type="text"
+                class="
+                    input-text
+                    flex-1
+                    px-3
+                    text-lg
+                    rounded-md
+                    text-black
+                    outline-0
+                    bg-white
+                "
+                placeholder="Type a message..."
+            >
+
+
+            <button
+                type="button"
+                class="
+                    send-btn
+                    rounded-full
+                    w-[3rem]
+                    aspect-square
+                    bg-white
+                    flex
+                    items-center
+                    justify-center
+                    active:scale-90
+                    transition
+                "
+                aria-label="Send message"
+            >
+
+                <img
+                    class="w-[50%]"
+                    src="/assets/send.svg"
+                    alt="Send"
+                >
+
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================
+         CHERRY VOICE SECTION
+    ====================================== -->
+
+    <div
+        class="
+            speak
+            rounded-md
+            bg-[#f9f9f9]
+            flex
+            items-center
+            justify-center
+            flex-1
+            flex-col
+            gap-5
+        "
+    >
+
+
+        <!-- VOICE STATUS -->
+
+        <div
+            id="voiceStatus"
+            data-state="idle"
+            class="
+                flex
+                flex-col
+                items-center
+                gap-4
+            "
+            aria-live="polite"
+        >
+
+
+            <!-- CHERRY IMAGE -->
+
+            <div
+                class="
+                    voice-ring
+                    relative
+                    rounded-full
+                    p-3
+                "
+            >
+
+                <div
+                    id="voicePulse"
+                    class="
+                        rounded-full
+                        overflow-hidden
+                    "
+                >
+
+                    <img
+                        class="
+                            h-[35vh]
+                            max-h-[320px]
+                            aspect-square
+                            object-contain
+                        "
+                        src="/assets/ai.gif"
+                        alt="Cherry AI"
+                    >
+
+                </div>
+
+            </div>
+
+
+            <!-- STATUS -->
+
+            <div
+                class="
+                    flex
+                    items-center
+                    gap-2
+                    min-h-[2rem]
+                "
+            >
+
+                <div class="status-dot"></div>
+
+
+                <p
+                    id="voiceStatusText"
+                    class="
+                        text-xl
+                        font-semibold
+                        text-gray-800
+                        max-w-[70vw]
+                        lg:max-w-[30vw]
+                        text-center
+                        truncate
+                    "
+                >
+                    Click Start Cherry to speak
+                </p>
+
+            </div>
+
+
+            <!-- SECONDARY STATUS -->
+
+            <p
+                class="
+                    text-sm
+                    text-gray-500
+                    -mt-2
+                "
+            >
+                Microphone input is enabled
+            </p>
+
+        </div>
+
+
+        <!-- START BUTTON -->
+
+        <button
+            id="startBtn"
+            type="button"
+            class="
+                bg-blue-600
+                text-white
+                px-6
+                py-2.5
+                rounded-md
+                active:scale-95
+                transition-all
+                duration-200
+                shadow-md
+            "
+        >
+            Start Cherry
+        </button>
+
+
+        <!-- TIMETABLE -->
+
+        <a
+            class="my-2 mx-auto"
+            href="/"
+        >
+
+            <button
+                type="button"
+                class="
+                    bg-[#D2042D]
+                    py-2
+                    px-3
+                    text-white
+                    rounded-md
+                    hover:opacity-90
+                    active:scale-95
+                    transition
+                "
+            >
+                View Timetable
+            </button>
+
+        </a>
+
+    </div>
+
+
+    <!-- MARKED -->
+
+    <script
+        src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"
+    ></script>
+
+
+    <!-- CHERRY -->
+
+    <script
+        src="./scripts/talk.js"
+    ></script>
+
+</body>
+
+</html>
