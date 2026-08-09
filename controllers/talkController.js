@@ -10,7 +10,7 @@ const pdInfo = require("../jsons/pdInfo.json");
 const rooms = require("../jsons/classes.json");  
 
 // Gemini AI instance  
-const ai = new GoogleGenAI({});  
+const ai = new GoogleGenAI({apiKey: process.env.GEMINI_API_KEY});  
 
 // Chat session (initialized later)  
 let chat;  

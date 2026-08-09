@@ -1,6 +1,7 @@
 // -----------------------------
 // Required Modules
 // -----------------------------
+require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const { init, cherry } = require("./controllers/talkController.js");

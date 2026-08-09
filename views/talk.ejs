@@ -2,72 +2,445 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <title>Voice Assistant</title>
-  
-  <!-- Custom styles can go here -->
-  <style type="text/css" media="all">
-    /* Add any custom CSS here */
-  </style>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <title>Cherry — Voice Assistant</title>
+
+
+    <style>
+
+        body {
+            margin: 0;
+        }
+
+
+        /* ==========================
+           CHERRY VOICE RING
+        ========================== */
+
+        .voice-ring {
+
+            transition:
+                transform 300ms ease,
+                opacity 300ms ease,
+                box-shadow 300ms ease;
+        }
+
+
+        /* LISTENING */
+
+        [data-state="listening"] .voice-ring {
+
+            transform: scale(1.06);
+
+            box-shadow:
+                0 0 0 10px rgba(37, 99, 235, 0.08),
+                0 0 35px rgba(37, 99, 235, 0.35);
+        }
+
+
+        /* THINKING */
+
+        [data-state="processing"] .voice-ring {
+
+            box-shadow:
+                0 0 0 10px rgba(234, 179, 8, 0.08),
+                0 0 35px rgba(234, 179, 8, 0.35);
+        }
+
+
+        /* SPEAKING */
+
+        [data-state="speaking"] .voice-ring {
+
+            transform: scale(1.1);
+
+            box-shadow:
+                0 0 0 10px rgba(147, 51, 234, 0.08),
+                0 0 40px rgba(147, 51, 234, 0.4);
+        }
+
+
+        /* ==========================
+           STATUS DOT
+        ========================== */
+
+        .status-dot {
+
+            width: 8px;
+            height: 8px;
+
+            border-radius: 50%;
+
+            background: #9ca3af;
+
+            transition:
+                background 300ms ease,
+                box-shadow 300ms ease;
+        }
+
+
+        [data-state="listening"] .status-dot {
+
+            background: #2563eb;
+
+            box-shadow:
+                0 0 12px #2563eb;
+        }
+
+
+        [data-state="processing"] .status-dot {
+
+            background: #eab308;
+
+            box-shadow:
+                0 0 12px #eab308;
+        }
+
+
+        [data-state="speaking"] .status-dot {
+
+            background: #9333ea;
+
+            box-shadow:
+                0 0 12px #9333ea;
+        }
+
+
+        /* ==========================
+           STATUS TEXT
+        ========================== */
+
+        #voiceStatusText {
+
+            transition:
+                color 300ms ease;
+        }
+
+
+        [data-state="listening"]
+        #voiceStatusText {
+
+            color: #2563eb;
+        }
+
+
+        [data-state="processing"]
+        #voiceStatusText {
+
+            color: #ca8a04;
+        }
+
+
+        [data-state="speaking"]
+        #voiceStatusText {
+
+            color: #9333ea;
+        }
+
+    </style>
+
 </head>
 
-<body class="bg-gray-200 w-full h-screen flex flex-col lg:flex-row gap-2 px-2 py-2">
-  
-  <!-- ==============================
-       Chat Box / Text Interaction
-       ============================== -->
-  <div class="rounded-md bg-black flex flex-col items-center flex-1 px-4 relative max-h-[50%]">
-    
-    <!-- Chat messages container -->
-    <div class="container h-[80%] w-overflow-y-scroll overflow-x-hidden flex flex flex-col gap-1">
-      <!-- Dynamic chat messages will be appended here -->
-    </div>
-    
-    <!-- Input area for user -->
-    <div class="typer w-[95%] mx-auto flex gap-1 absolute bottom-[0.5rem]">
-      <input type="text" class="input-text flex-1 px-2 text-lg rounded-md text-black outline-0 bg-wrounded-full-full" placeholder="Type a message..." />
-      <button type="submit" class="send-btn rounded-full w-[3rem] aspect-square bg-white flex items-center justify-center">
-        <img class="w-[50%]" src="/assets/send.svg" alt="Send" />
-      </button>
-    </div>
-    
-    <!-- Voice feedback / speaindicatorcator could go here -->
-    
-  </div>
-  
-  <!-- ==============================
-       AI / Voice Control Section
-       ============================== -->
-  <div class="speak rounded-md bg-[#f9f9f9] flex items-center justify-center flex-1 flex-col">
-    
-    <!-- AI animation / GIF -->
-    <img class="h-[50%] aspect-[172/129]" src="/assets/ai.gif" alt="AI Animation" />
-    
-    <!-- Start voice assistant button -->
-    <button id="startBtn" class="bg-blue-600 text-white p-2 rounded active:opacity-[0.8]">
-      Start Cherry
-    </button>
 
-    <!--this is route to /index -->
-  <a class="my-2 mx-auto text-white hove:text:white" href="/">
-    <button class="bg-[#D2042D] py-2 px-3 text-white rounded-md">View Timetable</button>
-  </a>
-  </div>
+<body
+    class="
+        bg-gray-200
+        w-full
+        min-h-screen
+        flex
+        flex-col
+        lg:flex-row
+        gap-2
+        p-2
+    "
+>
 
-  
-  <!-- ==============================
-       Libraries & Scripts
-       ============================== -->
-  <!-- Markdown parser -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  
-  <!-- Custom talk/voice script -->
-  <script src="./scripts/talk.js"></script>
+
+    <!-- =====================================
+         CHAT
+    ====================================== -->
+
+    <div
+        class="
+            rounded-md
+            bg-black
+            flex
+            flex-col
+            items-center
+            flex-1
+            px-4
+            relative
+            min-h-[50vh]
+            lg:min-h-0
+        "
+    >
+
+        <div
+            class="
+                container
+                h-full
+                w-full
+                overflow-y-auto
+                overflow-x-hidden
+                flex
+                flex-col
+                gap-1
+                pb-20
+            "
+        >
+
+            <!-- Messages appear here -->
+
+        </div>
+
+
+        <!-- INPUT -->
+
+        <div
+            class="
+                typer
+                w-[95%]
+                mx-auto
+                flex
+                gap-2
+                absolute
+                bottom-2
+            "
+        >
+
+            <input
+                type="text"
+                class="
+                    input-text
+                    flex-1
+                    px-3
+                    text-lg
+                    rounded-md
+                    text-black
+                    outline-0
+                    bg-white
+                "
+                placeholder="Type a message..."
+            >
+
+
+            <button
+                type="button"
+                class="
+                    send-btn
+                    rounded-full
+                    w-[3rem]
+                    aspect-square
+                    bg-white
+                    flex
+                    items-center
+                    justify-center
+                    active:scale-90
+                    transition
+                "
+                aria-label="Send message"
+            >
+
+                <img
+                    class="w-[50%]"
+                    src="/assets/send.svg"
+                    alt="Send"
+                >
+
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================
+         CHERRY VOICE SECTION
+    ====================================== -->
+
+    <div
+        class="
+            speak
+            rounded-md
+            bg-[#f9f9f9]
+            flex
+            items-center
+            justify-center
+            flex-1
+            flex-col
+            gap-5
+        "
+    >
+
+
+        <!-- VOICE STATUS -->
+
+        <div
+            id="voiceStatus"
+            data-state="idle"
+            class="
+                flex
+                flex-col
+                items-center
+                gap-4
+            "
+            aria-live="polite"
+        >
+
+
+            <!-- CHERRY IMAGE -->
+
+            <div
+                class="
+                    voice-ring
+                    relative
+                    rounded-full
+                    p-3
+                "
+            >
+
+                <div
+                    id="voicePulse"
+                    class="
+                        rounded-full
+                        overflow-hidden
+                    "
+                >
+
+                    <img
+                        class="
+                            h-[35vh]
+                            max-h-[320px]
+                            aspect-square
+                            object-contain
+                        "
+                        src="/assets/ai.gif"
+                        alt="Cherry AI"
+                    >
+
+                </div>
+
+            </div>
+
+
+            <!-- STATUS -->
+
+            <div
+                class="
+                    flex
+                    items-center
+                    gap-2
+                    min-h-[2rem]
+                "
+            >
+
+                <div class="status-dot"></div>
+
+
+                <p
+                    id="voiceStatusText"
+                    class="
+                        text-xl
+                        font-semibold
+                        text-gray-800
+                        max-w-[70vw]
+                        lg:max-w-[30vw]
+                        text-center
+                        truncate
+                    "
+                >
+                    Click Start Cherry to speak
+                </p>
+
+            </div>
+
+
+            <!-- SECONDARY STATUS -->
+
+            <p
+                class="
+                    text-sm
+                    text-gray-500
+                    -mt-2
+                "
+            >
+                Microphone input is enabled
+            </p>
+
+        </div>
+
+
+        <!-- START BUTTON -->
+
+        <button
+            id="startBtn"
+            type="button"
+            class="
+                bg-blue-600
+                text-white
+                px-6
+                py-2.5
+                rounded-md
+                active:scale-95
+                transition-all
+                duration-200
+                shadow-md
+            "
+        >
+            Start Cherry
+        </button>
+
+
+        <!-- TIMETABLE -->
+
+        <a
+            class="my-2 mx-auto"
+            href="/"
+        >
+
+            <button
+                type="button"
+                class="
+                    bg-[#D2042D]
+                    py-2
+                    px-3
+                    text-white
+                    rounded-md
+                    hover:opacity-90
+                    active:scale-95
+                    transition
+                "
+            >
+                View Timetable
+            </button>
+
+        </a>
+
+    </div>
+
+
+    <!-- MARKED -->
+
+    <script
+        src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"
+    ></script>
+
+
+    <!-- CHERRY -->
+
+    <script
+        src="./scripts/talk.js"
+    ></script>
+
 </body>
 
 </html>
