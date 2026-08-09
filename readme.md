@@ -231,7 +231,6 @@ For the best experience:
 
 ## Screenshots
 
-Add screenshots of Cherry here.
 ![Cherry TimeTable](./docs/ttable.png)
 ![Cherry Screenshot](./docs/cherry.png)
 
