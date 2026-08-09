@@ -1,203 +1,67 @@
-// ============================================================
-// CHERRY VOICE CONTROLLER
-// ============================================================
+"use strict";
 
-.log("%c[CHERRY] talk.js loaded", "color:#22c55e;font-weight:bold;");
+// ==========================================
+// DOM ELEMENTS
+// ==========================================
 
+const input =
+    document.querySelector(".input-text");
 
-// ============================================================
-// DOM
-// ============================================================
+const sendButton =
+    document.querySelector(".send-btn");
 
-const textInp =
-    document.getElementsByClassName("input-text")[0];
+const chatContainer =
+    document.querySelector(".container");
 
-const sendBtn =
-    document.getElementsByClassName("send-btn")[0];
-
-const startBtn =
-    document.getElementById("startBtn");
+const startButton =
+    document.querySelector("#startBtn");
 
 const voiceStatus =
-    document.getElementById("voiceStatus");
+    document.querySelector("#voiceStatus");
 
 const voiceStatusText =
-    document.getElementById("voiceStatusText");
-
-const voicePulse =
-    document.getElementById("voicePulse");
+    document.querySelector("#voiceStatusText");
 
 
-// ============================================================
+// ==========================================
 // STATE
-// ============================================================
+// ==========================================
 
-let rec = null;
+let recognition = null;
 
 let isListening = false;
-
 let isProcessing = false;
+let isSpeaking = false;
 
-let shouldListen = false;
-
-let silenceTimer = null;
-
-let finalTranscript = "";
+let shouldKeepListening = false;
 
 
-// ============================================================
-// SETTINGS
-// ============================================================
+// ==========================================
+// VOICE STATUS
+// ==========================================
 
-const SILENCE_TIMEOUT = 1500;
+function setVoiceState(state, text) {
 
+    if (!voiceStatus) return;
 
-// ============================================================
-// DEBUG LOGGER
-// ============================================================
-
-function log(...args) {
-
-    console.log(
-        "%c[CHERRY]",
-        "color:#9333ea;font-weight:bold;",
-        ...args
-    );
-}
-
-
-function warn(...args) {
-
-    console.warn(
-        "%c[CHERRY]",
-        "color:#eab308;font-weight:bold;",
-        ...args
-    );
-}
-
-
-function error(...args) {
-
-    console.error(
-        "%c[CHERRY]",
-        "color:#ef4444;font-weight:bold;",
-        ...args
-    );
-}
-
-
-// ============================================================
-// VOICE STATE
-// ============================================================
-
-function setVoiceState(state, message) {
-
-    log(
-        `STATE → ${state.toUpperCase()}`,
-        "|",
-        message
-    );
-
-
-    if (voiceStatus) {
-
-        voiceStatus.dataset.state =
-            state;
-    }
-
+    voiceStatus.dataset.state = state;
 
     if (voiceStatusText) {
-
-        voiceStatusText.textContent =
-            message;
-    }
-
-
-    if (!startBtn) return;
-
-
-    startBtn.classList.remove(
-        "bg-blue-600",
-        "bg-red-600",
-        "bg-yellow-500",
-        "bg-purple-600"
-    );
-
-
-    if (state === "listening") {
-
-        startBtn.textContent =
-            "Stop Cherry";
-
-        startBtn.classList.add(
-            "bg-red-600"
-        );
-    }
-
-
-    else if (state === "processing") {
-
-        startBtn.textContent =
-            "Thinking...";
-
-        startBtn.classList.add(
-            "bg-yellow-500"
-        );
-    }
-
-
-    else if (state === "speaking") {
-
-        startBtn.textContent =
-            "Speaking...";
-
-        startBtn.classList.add(
-            "bg-purple-600"
-        );
-    }
-
-
-    else {
-
-        startBtn.textContent =
-            "Start Cherry";
-
-        startBtn.classList.add(
-            "bg-blue-600"
-        );
+        voiceStatusText.textContent = text;
     }
 }
 
 
-// ============================================================
-// CHAT MESSAGE
-// ============================================================
+// ==========================================
+// APPEND MESSAGE
+// ==========================================
 
 function appendMessage(text, user) {
 
-    log(
-        `Adding ${user} message:`,
-        text
-    );
-
-
-    const container =
-        document.querySelector(".container");
-
-
-    if (!container) {
-
-        error(
-            "Chat container (.container) not found!"
-        );
-
-        return;
-    }
-
+    if (!chatContainer) return;
 
     const box =
         document.createElement("div");
-
 
     box.className = `
         box
@@ -214,898 +78,86 @@ function appendMessage(text, user) {
             ? "bg-[#FFFAF5]"
             : "bg-[#DCF8C6]"
         }
-    `;
+    `.trim();
 
+
+    // ======================================
+    // ICON
+    // ======================================
 
     const strong =
         document.createElement("strong");
 
-
     strong.className =
         "text-black";
 
-
     strong.textContent =
         user === "ai"
-            ? "Cherry"
-            : "You";
-
+            ? "🤖"
+            : "🧑‍💻";
 
     box.appendChild(strong);
 
 
+    // ======================================
+    // MESSAGE
+    // ======================================
+
     const p =
         document.createElement("p");
-
 
     p.className =
         "text-black";
 
 
-    if (user === "ai") {
+    if (
+        user === "ai" &&
+        typeof marked !== "undefined"
+    ) {
 
         p.innerHTML =
             marked.parse(text);
 
     } else {
 
-        p.textContent =
-            text;
+        p.textContent = text;
+
     }
 
 
     box.appendChild(p);
 
+    chatContainer.appendChild(box);
 
-    container.appendChild(box);
 
+    // ======================================
+    // AUTO SCROLL
+    // ======================================
 
-    container.scrollTop =
-        container.scrollHeight;
+    chatContainer.scrollTop =
+        chatContainer.scrollHeight;
 }
 
 
-// ============================================================
-// SILENCE TIMER
-// ============================================================
-
-function clearSilenceTimer() {
-
-    if (silenceTimer) {
-
-        clearTimeout(
-            silenceTimer
-        );
-
-        silenceTimer = null;
-
-        log(
-            "Silence timer cleared"
-        );
-    }
-}
-
-
-function startSilenceTimer() {
-
-    clearSilenceTimer();
-
-
-    log(
-        `Silence timer started (${SILENCE_TIMEOUT}ms)`
-    );
-
-
-    silenceTimer =
-        setTimeout(() => {
-
-            log(
-                "SILENCE DETECTED"
-            );
-
-
-            if (
-                finalTranscript.trim() &&
-                !isProcessing
-            ) {
-
-                submitSpeech();
-
-            } else {
-
-                log(
-                    "Silence detected but there is no final transcript"
-                );
-            }
-
-        }, SILENCE_TIMEOUT);
-}
-
-
-// ============================================================
-// SUBMIT SPEECH
-// ============================================================
-
-function submitSpeech() {
-
-    clearSilenceTimer();
-
-
-    const question =
-        finalTranscript.trim();
-
-
-    finalTranscript =
-        "";
-
-
-    if (!question) {
-
-        warn(
-            "submitSpeech() called with empty transcript"
-        );
-
-        return;
-    }
-
-
-    log(
-        "FINAL QUESTION:",
-        question
-    );
-
-
-    appendMessage(
-        question,
-        "human"
-    );
-
-
-    sendQuestion(
-        question
-    );
-}
-
-
-// ============================================================
-// CREATE RECOGNITION
-// ============================================================
-
-function createRecognition() {
-
-    log(
-        "Creating SpeechRecognition instance..."
-    );
-
-
-    if (
-        !("webkitSpeechRecognition" in window)
-    ) {
-
-        error(
-            "webkitSpeechRecognition is NOT available"
-        );
-
-        return null;
-    }
-
-
-    const recognition =
-        new webkitSpeechRecognition();
-
-
-    recognition.continuous =
-        true;
-
-
-    recognition.interimResults =
-        true;
-
-
-    recognition.lang =
-        "en-US";
-
-
-    recognition.maxAlternatives =
-        1;
-
-
-    log(
-        "Recognition configuration:",
-        {
-            continuous:
-                recognition.continuous,
-
-            interimResults:
-                recognition.interimResults,
-
-            lang:
-                recognition.lang,
-
-            maxAlternatives:
-                recognition.maxAlternatives
-        }
-    );
-
-
-    // ========================================================
-    // START
-    // ========================================================
-
-    recognition.onstart = () => {
-
-        log(
-            "🎤 MICROPHONE RECOGNITION STARTED"
-        );
-
-
-        isListening =
-            true;
-
-
-        setVoiceState(
-            "listening",
-            "Listening..."
-        );
-    };
-
-
-    // ========================================================
-    // AUDIO START
-    // ========================================================
-
-    recognition.onaudiostart = () => {
-
-        log(
-            "🎙 Audio capture started"
-        );
-    };
-
-
-    // ========================================================
-    // SOUND START
-    // ========================================================
-
-    recognition.onsoundstart = () => {
-
-        log(
-            "🔊 Sound detected"
-        );
-    };
-
-
-    // ========================================================
-    // SPEECH START
-    // ========================================================
-
-    recognition.onspeechstart = () => {
-
-        log(
-            "🗣 Speech detected"
-        );
-
-        clearSilenceTimer();
-    };
-
-
-    // ========================================================
-    // SPEECH END
-    // ========================================================
-
-    recognition.onspeechend = () => {
-
-        log(
-            "🛑 Speech ended"
-        );
-
-        startSilenceTimer();
-    };
-
-
-    // ========================================================
-    // RESULT
-    // ========================================================
-
-    recognition.onresult =
-        (event) => {
-
-        log(
-            "Recognition result event:",
-            event
-        );
-
-
-        let interimTranscript =
-            "";
-
-
-        for (
-            let i = event.resultIndex;
-            i < event.results.length;
-            i++
-        ) {
-
-            const result =
-                event.results[i];
-
-
-            const transcript =
-                result[0]
-                    .transcript
-                    .trim();
-
-
-            log(
-                result.isFinal
-                    ? "FINAL:"
-                    : "INTERIM:",
-                transcript
-            );
-
-
-            if (
-                result.isFinal
-            ) {
-
-                finalTranscript +=
-                    transcript + " ";
-
-            } else {
-
-                interimTranscript +=
-                    transcript + " ";
-            }
-        }
-
-
-        // ----------------------------------------
-        // SHOW LIVE TRANSCRIPT
-        // ----------------------------------------
-
-        if (
-            interimTranscript &&
-            voiceStatusText
-        ) {
-
-            voiceStatusText.textContent =
-                `Listening: ${interimTranscript.trim()}`;
-        }
-
-
-        // ----------------------------------------
-        // RESET SILENCE TIMER
-        // ----------------------------------------
-
-        if (
-            interimTranscript.trim()
-        ) {
-
-            clearSilenceTimer();
-        }
-
-
-        if (
-            finalTranscript.trim()
-        ) {
-
-            startSilenceTimer();
-        }
-    };
-
-
-    // ========================================================
-    // AUDIO END
-    // ========================================================
-
-    recognition.onaudioend = () => {
-
-        log(
-            "🎙 Audio capture ended"
-        );
-    };
-
-
-    // ========================================================
-    // SOUND END
-    // ========================================================
-
-    recognition.onsoundend = () => {
-
-        log(
-            "🔇 Sound ended"
-        );
-    };
-
-
-    // ========================================================
-    // ERROR
-    // ========================================================
-
-    recognition.onerror =
-        (event) => {
-
-        error(
-            "❌ SPEECH RECOGNITION ERROR:",
-            event.error
-        );
-
-
-        error(
-            "Full recognition error:",
-            event
-        );
-
-
-        switch (
-            event.error
-        ) {
-
-            case "network":
-
-                error(
-                    "Chrome speech recognition network service failed."
-                );
-
-
-                shouldListen =
-                    false;
-
-
-                isListening =
-                    false;
-
-
-                clearSilenceTimer();
-
-
-                setVoiceState(
-                    "idle",
-                    "Speech service unavailable"
-                );
-
-
-                break;
-
-
-            case "not-allowed":
-
-                error(
-                    "Microphone permission denied."
-                );
-
-
-                shouldListen =
-                    false;
-
-
-                isListening =
-                    false;
-
-
-                setVoiceState(
-                    "idle",
-                    "Microphone permission denied"
-                );
-
-
-                break;
-
-
-            case "audio-capture":
-
-                error(
-                    "No microphone/audio capture device."
-                );
-
-
-                shouldListen =
-                    false;
-
-
-                isListening =
-                    false;
-
-
-                setVoiceState(
-                    "idle",
-                    "Microphone unavailable"
-                );
-
-
-                break;
-
-
-            case "no-speech":
-
-                warn(
-                    "No speech detected."
-                );
-
-
-                setVoiceState(
-                    "listening",
-                    "Listening..."
-                );
-
-
-                break;
-
-
-            default:
-
-                warn(
-                    "Unhandled recognition error:",
-                    event.error
-                );
-        }
-    };
-
-
-    // ========================================================
-    // END
-    // ========================================================
-
-    recognition.onend =
-        () => {
-
-        log(
-            "Recognition ended"
-        );
-
-
-        isListening =
-            false;
-
-
-        /*
-         * If there is already a complete sentence,
-         * submit it.
-         */
-
-        if (
-            finalTranscript.trim() &&
-            !isProcessing
-        ) {
-
-            log(
-                "Recognition ended with transcript → submitting"
-            );
-
-
-            submitSpeech();
-
-            return;
-        }
-
-
-        /*
-         * Restart only if Cherry should still
-         * be listening.
-         */
-
-        if (
-            shouldListen &&
-            !isProcessing &&
-            !speechSynthesis.speaking
-        ) {
-
-            log(
-                "Restarting recognition..."
-            );
-
-
-            setTimeout(() => {
-
-                if (
-                    !shouldListen ||
-                    isListening
-                ) {
-
-                    return;
-                }
-
-
-                try {
-
-                    recognition.start();
-
-                }
-
-                catch (err) {
-
-                    warn(
-                        "Recognition restart failed:",
-                        err
-                    );
-                }
-
-            }, 300);
-
-
-            return;
-        }
-
-
-        if (
-            !isProcessing &&
-            !speechSynthesis.speaking
-        ) {
-
-            setVoiceState(
-                "idle",
-                "Click Start Cherry to speak"
-            );
-        }
-    };
-
-
-    return recognition;
-}
-
-
-// ============================================================
-// START / STOP CHERRY
-// ============================================================
-
-if (
-    !("webkitSpeechRecognition" in window)
-) {
-
-    error(
-        "Speech recognition is not supported by this browser."
-    );
-
-
-    setVoiceState(
-        "idle",
-        "Speech recognition unsupported"
-    );
-
-
-    if (startBtn) {
-
-        startBtn.disabled =
-            true;
-    }
-
-}
-
-else {
-
-    log(
-        "SpeechRecognition API detected"
-    );
-
-
-    startBtn.onclick =
-        async () => {
-
-        // ====================================================
-        // STOP
-        // ====================================================
-
-        if (
-            shouldListen ||
-            isListening
-        ) {
-
-            log(
-                "Stopping Cherry..."
-            );
-
-
-            shouldListen =
-                false;
-
-
-            isListening =
-                false;
-
-
-            clearSilenceTimer();
-
-
-            if (rec) {
-
-                try {
-
-                    rec.stop();
-
-                }
-
-                catch (err) {
-
-                    warn(
-                        "Error stopping recognition:",
-                        err
-                    );
-                }
-            }
-
-
-            speechSynthesis.cancel();
-
-
-            finalTranscript =
-                "";
-
-
-            setVoiceState(
-                "idle",
-                "Click Start Cherry to speak"
-            );
-
-
-            return;
-        }
-
-
-        // ====================================================
-        // START
-        // ====================================================
-
-        log(
-            "================================="
-        );
-
-        log(
-            "STARTING CHERRY"
-        );
-
-        log(
-            "================================="
-        );
-
-
-        try {
-
-            log(
-                "Requesting microphone permission..."
-            );
-
-
-            const stream =
-                await navigator
-                    .mediaDevices
-                    .getUserMedia({
-                        audio: true
-                    });
-
-
-            log(
-                "Microphone permission granted"
-            );
-
-
-            // Show which audio devices are available.
-
-            try {
-
-                const devices =
-                    await navigator
-                        .mediaDevices
-                        .enumerateDevices();
-
-
-                const microphones =
-                    devices.filter(
-                        device =>
-                            device.kind ===
-                            "audioinput"
-                    );
-
-
-                log(
-                    "Available microphones:",
-                    microphones
-                );
-
-            }
-
-            catch (deviceError) {
-
-                warn(
-                    "Could not enumerate devices:",
-                    deviceError
-                );
-            }
-
-
-            /*
-             * We only needed getUserMedia to verify
-             * microphone access.
-             *
-             * Stop this temporary stream.
-             */
-
-            stream
-                .getTracks()
-                .forEach(
-                    track =>
-                        track.stop()
-                );
-
-
-            rec =
-                createRecognition();
-
-
-            if (!rec) {
-
-                throw new Error(
-                    "Could not create SpeechRecognition"
-                );
-            }
-
-
-            shouldListen =
-                true;
-
-
-            finalTranscript =
-                "";
-
-
-            log(
-                "Starting recognition..."
-            );
-
-
-            rec.start();
-
-        }
-
-        catch (err) {
-
-            error(
-                "FAILED TO START CHERRY:",
-                err
-            );
-
-
-            shouldListen =
-                false;
-
-
-            isListening =
-                false;
-
-
-            setVoiceState(
-                "idle",
-                "Could not start microphone"
-            );
-        }
-    };
-}
-
-
-// ============================================================
+// ==========================================
 // SEND QUESTION
-// ============================================================
+// ==========================================
 
 async function sendQuestion(question) {
 
-    if (
-        !question ||
-        isProcessing
-    ) {
-
-        warn(
-            "sendQuestion ignored:",
-            {
-                question,
-                isProcessing
-            }
-        );
-
+    if (!question || !question.trim()) {
         return;
     }
 
+    question =
+        question.trim();
 
-    isProcessing =
-        true;
 
+    // ======================================
+    // PROCESSING
+    // ======================================
+
+    isProcessing = true;
 
     setVoiceState(
         "processing",
@@ -1113,65 +165,31 @@ async function sendQuestion(question) {
     );
 
 
-    log(
-        "================================="
-    );
-
-
-    log(
-        "SENDING QUESTION TO /ques"
-    );
-
-
-    log(
-        "Question:",
-        question
-    );
-
-
     try {
 
         const response =
-            await fetch(
-                "/ques",
-                {
-                    method:
-                        "POST",
+            await fetch("/ques", {
 
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
+                method: "POST",
 
-                    body:
-                        JSON.stringify({
-                            question
-                        })
-                }
-            );
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
 
+                body: JSON.stringify({
+                    question: question
+                })
 
-        log(
-            "HTTP status:",
-            response.status
-        );
+            });
 
 
         if (!response.ok) {
 
-            const errorText =
-                await response.text();
-
-
-            error(
-                "Server returned error:",
-                errorText
-            );
-
-
             throw new Error(
-                `HTTP ${response.status}`
+                `Server error: ${response.status}`
             );
+
         }
 
 
@@ -1179,18 +197,16 @@ async function sendQuestion(question) {
             await response.json();
 
 
-        log(
-            "SERVER RESPONSE:",
+        console.log(
+            "Cherry response:",
             result
         );
 
 
         /*
-         * Your current server uses:
+         * Keeping your existing backend key:
          *
-         * res.json({
-         *     responce: response.text
-         * })
+         * result.responce
          */
 
         const answer =
@@ -1199,27 +215,16 @@ async function sendQuestion(question) {
 
         if (!answer) {
 
-            error(
-                "Server response does not contain 'responce':",
-                result
-            );
-
-
             throw new Error(
-                "Empty AI response"
+                "Empty response from Cherry"
             );
+
         }
 
 
-        log(
-            "CHERRY ANSWER:",
-            answer
-        );
-
-
-        // ==============================================
-        // PUT RESPONSE ON BOARD
-        // ==============================================
+        // ==================================
+        // DISPLAY AI RESPONSE
+        // ==================================
 
         appendMessage(
             answer,
@@ -1227,221 +232,702 @@ async function sendQuestion(question) {
         );
 
 
-        // ==============================================
-        // SPEAK
-        // ==============================================
+        isProcessing = false;
 
-        speak(
-            answer
+
+        // ==================================
+        // SPEAK RESPONSE
+        // ==================================
+
+        await speak(answer);
+
+
+    } catch (error) {
+
+        console.error(
+            "Cherry error:",
+            error
         );
 
-    }
 
-    catch (err) {
-
-        error(
-            "REQUEST FAILED:",
-            err
-        );
+        isProcessing = false;
 
 
         appendMessage(
-            "Sorry, I couldn't get a response.",
+            "Sorry, I couldn't process that request.",
             "ai"
         );
 
 
         setVoiceState(
             "idle",
-            "Something went wrong"
+            "Click Start Cherry to speak"
         );
+
     }
 
-
-    finally {
-
-        isProcessing =
-            false;
-
-
-        log(
-            "Request finished"
-        );
-    }
 }
 
 
-// ============================================================
-// TEXT SEND
-// ============================================================
+// ==========================================
+// TEXT MESSAGE
+// ==========================================
 
-sendBtn.addEventListener(
-    "click",
-    () => {
+function sendTextMessage() {
 
-        const text =
-            textInp.value.trim();
+    if (!input) return;
 
+    const text =
+        input.value.trim();
+
+
+    if (!text) {
+        return;
+    }
+
+
+    // Display immediately
+
+    appendMessage(
+        text,
+        "human"
+    );
+
+
+    // Clear input
+
+    input.value = "";
+
+
+    // Send
+
+    sendQuestion(text);
+}
+
+
+// ==========================================
+// SEND BUTTON
+// ==========================================
+
+if (sendButton) {
+
+    sendButton.addEventListener(
+        "click",
+        sendTextMessage
+    );
+
+}
+
+
+// ==========================================
+// ENTER KEY
+// ==========================================
+
+if (input) {
+
+    input.addEventListener(
+        "keydown",
+        (event) => {
+
+            if (
+                event.key === "Enter" &&
+                !event.shiftKey
+            ) {
+
+                event.preventDefault();
+
+                sendTextMessage();
+
+            }
+
+        }
+    );
+
+}
+
+
+// ==========================================
+// SPEECH RECOGNITION
+// ==========================================
+
+const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+
+if (!SpeechRecognition) {
+
+    console.warn(
+        "Speech recognition is not supported."
+    );
+
+
+    setVoiceState(
+        "idle",
+        "Speech recognition is not supported."
+    );
+
+
+    if (startButton) {
+
+        startButton.disabled = true;
+
+        startButton.textContent =
+            "Speech Not Supported";
+
+    }
+
+} else {
+
+    recognition =
+        new SpeechRecognition();
+
+
+    // ======================================
+    // RECOGNITION SETTINGS
+    // ======================================
+
+    recognition.continuous = true;
+
+    recognition.interimResults = false;
+
+    recognition.lang = "en-US";
+
+
+    // ======================================
+    // RECOGNITION START
+    // ======================================
+
+    recognition.onstart = () => {
+
+        isListening = true;
+
+        setVoiceState(
+            "listening",
+            "Listening..."
+        );
+
+
+        if (startButton) {
+
+            startButton.textContent =
+                "Stop Cherry";
+
+        }
+
+
+        console.log(
+            "Cherry is listening..."
+        );
+
+    };
+
+
+    // ======================================
+    // SPEECH RESULT
+    // ======================================
+
+    recognition.onresult =
+        (event) => {
+
+            let finalTranscript = "";
+
+
+            for (
+                let i = event.resultIndex;
+                i < event.results.length;
+                i++
+            ) {
+
+                const result =
+                    event.results[i];
+
+
+                if (result.isFinal) {
+
+                    finalTranscript +=
+                        result[0].transcript + " ";
+
+                }
+
+            }
+
+
+            finalTranscript =
+                finalTranscript.trim();
+
+
+            if (!finalTranscript) {
+                return;
+            }
+
+
+            console.log(
+                "User said:",
+                finalTranscript
+            );
+
+
+            // ==================================
+            // SHOW USER MESSAGE
+            // ==================================
+
+            appendMessage(
+                finalTranscript,
+                "human"
+            );
+
+
+            // ==================================
+            // SEND TO AI
+            // ==================================
+
+            sendQuestion(
+                finalTranscript
+            );
+
+        };
+
+
+    // ======================================
+    // RECOGNITION END
+    // ======================================
+
+    recognition.onend = () => {
+
+        isListening = false;
+
+
+        console.log(
+            "Speech recognition ended."
+        );
+
+
+        /*
+         * If Cherry is speaking or processing,
+         * don't restart recognition here.
+         */
 
         if (
-            !text ||
+            isSpeaking ||
             isProcessing
         ) {
 
             return;
+
         }
 
 
-        log(
-            "Text message:",
-            text
-        );
+        /*
+         * If user pressed Start Cherry,
+         * continue listening.
+         */
+
+        if (shouldKeepListening) {
+
+            setTimeout(
+                startListening,
+                300
+            );
+
+        } else {
+
+            setVoiceState(
+                "idle",
+                "Click Start Cherry to speak"
+            );
 
 
-        appendMessage(
-            text,
-            "human"
-        );
+            if (startButton) {
 
+                startButton.textContent =
+                    "Start Cherry";
 
-        textInp.value =
-            "";
+            }
 
-
-        sendQuestion(
-            text
-        );
-    }
-);
-
-
-// ============================================================
-// ENTER KEY
-// ============================================================
-
-textInp.addEventListener(
-    "keydown",
-    event => {
-
-        if (
-            event.key === "Enter"
-        ) {
-
-            event.preventDefault();
-
-            sendBtn.click();
         }
+
+    };
+
+
+    // ======================================
+    // RECOGNITION ERROR
+    // ======================================
+
+    recognition.onerror =
+        (event) => {
+
+            console.error(
+                "Speech recognition error:",
+                event.error
+            );
+
+
+            isListening = false;
+
+
+            if (
+                event.error ===
+                "not-allowed"
+            ) {
+
+                shouldKeepListening =
+                    false;
+
+
+                setVoiceState(
+                    "idle",
+                    "Microphone permission denied."
+                );
+
+            } else if (
+                event.error ===
+                "no-speech"
+            ) {
+
+                /*
+                 * Don't treat no-speech as a
+                 * fatal error.
+                 */
+
+                if (
+                    shouldKeepListening &&
+                    !isSpeaking &&
+                    !isProcessing
+                ) {
+
+                    setTimeout(
+                        startListening,
+                        300
+                    );
+
+                }
+
+            } else {
+
+                setVoiceState(
+                    "idle",
+                    "Voice recognition error."
+                );
+
+            }
+
+        };
+
+}
+
+
+// ==========================================
+// START LISTENING
+// ==========================================
+
+function startListening() {
+
+    if (!recognition) {
+        return;
     }
-);
 
 
-// ============================================================
+    if (isListening) {
+        return;
+    }
+
+
+    if (isSpeaking || isProcessing) {
+        return;
+    }
+
+
+    try {
+
+        recognition.start();
+
+    } catch (error) {
+
+        /*
+         * Browser can throw InvalidStateError
+         * if recognition is already starting.
+         */
+
+        console.log(
+            "Recognition start skipped:",
+            error.message
+        );
+
+    }
+
+}
+
+
+// ==========================================
+// STOP LISTENING
+// ==========================================
+
+function stopListening() {
+
+    if (!recognition) {
+        return;
+    }
+
+
+    if (!isListening) {
+        return;
+    }
+
+
+    try {
+
+        recognition.stop();
+
+    } catch (error) {
+
+        console.log(
+            "Recognition stop:",
+            error.message
+        );
+
+    }
+
+}
+
+
+// ==========================================
+// START / STOP BUTTON
+// ==========================================
+
+if (startButton) {
+
+    startButton.addEventListener(
+        "click",
+        () => {
+
+            /*
+             * If currently listening:
+             * completely stop Cherry.
+             */
+
+            if (isListening) {
+
+                shouldKeepListening =
+                    false;
+
+                stopListening();
+
+                setVoiceState(
+                    "idle",
+                    "Click Start Cherry to speak"
+                );
+
+                startButton.textContent =
+                    "Start Cherry";
+
+                return;
+            }
+
+
+            /*
+             * Start continuous voice mode.
+             */
+
+            shouldKeepListening =
+                true;
+
+
+            startListening();
+
+        }
+    );
+
+}
+
+
+// ==========================================
 // TEXT TO SPEECH
-// ============================================================
+// ==========================================
 
 function speak(text) {
 
-    log(
-        "Starting speech synthesis..."
-    );
+    return new Promise(
+        (resolve) => {
+
+            if (
+                !("speechSynthesis" in window)
+            ) {
+
+                resolve();
+
+                return;
+
+            }
 
 
-    speechSynthesis.cancel();
+            /*
+             * Stop listening before Cherry speaks.
+             */
+
+            if (isListening) {
+                stopListening();
+            }
 
 
-    const utterance =
-        new SpeechSynthesisUtterance(
-            text
-        );
+            isSpeaking = true;
 
 
-    utterance.lang =
-        "en-US";
+            /*
+             * Cancel anything currently speaking.
+             */
+
+            speechSynthesis.cancel();
 
 
-    utterance.rate =
-        1;
+            const utterance =
+                new SpeechSynthesisUtterance(
+                    text
+                );
 
 
-    utterance.pitch =
-        1;
+            utterance.lang =
+                "en-US";
+
+            utterance.rate =
+                1;
+
+            utterance.pitch =
+                1;
 
 
-    utterance.onstart =
-        () => {
+            // ==================================
+            // SPEECH START
+            // ==================================
 
-        log(
-            "🔊 CHERRY STARTED SPEAKING"
-        );
+            utterance.onstart = () => {
 
-
-        setVoiceState(
-            "speaking",
-            "Speaking..."
-        );
-    };
+                setVoiceState(
+                    "speaking",
+                    "Speaking..."
+                );
 
 
-    utterance.onend =
-        () => {
+                console.log(
+                    "Cherry is speaking..."
+                );
 
-        log(
-            "🔊 CHERRY FINISHED SPEAKING"
-        );
+            };
 
 
-        if (
-            shouldListen
-        ) {
+            // ==================================
+            // SPEECH END
+            // ==================================
 
-            setVoiceState(
-                "listening",
-                "Listening..."
+            utterance.onend = () => {
+
+                isSpeaking = false;
+
+
+                console.log(
+                    "Cherry finished speaking."
+                );
+
+
+                /*
+                 * If voice mode is still enabled,
+                 * automatically listen again.
+                 */
+
+                if (
+                    shouldKeepListening
+                ) {
+
+                    setVoiceState(
+                        "listening",
+                        "Listening..."
+                    );
+
+
+                    setTimeout(
+                        startListening,
+                        400
+                    );
+
+                } else {
+
+                    setVoiceState(
+                        "idle",
+                        "Click Start Cherry to speak"
+                    );
+
+                }
+
+
+                resolve();
+
+            };
+
+
+            // ==================================
+            // SPEECH ERROR
+            // ==================================
+
+            utterance.onerror =
+                (event) => {
+
+                    console.error(
+                        "Speech synthesis error:",
+                        event.error
+                    );
+
+
+                    isSpeaking = false;
+
+
+                    if (
+                        shouldKeepListening
+                    ) {
+
+                        setVoiceState(
+                            "listening",
+                            "Listening..."
+                        );
+
+
+                        setTimeout(
+                            startListening,
+                            400
+                        );
+
+                    } else {
+
+                        setVoiceState(
+                            "idle",
+                            "Click Start Cherry to speak"
+                        );
+
+                    }
+
+
+                    resolve();
+
+                };
+
+
+            // ==================================
+            // SPEAK
+            // ==================================
+
+            speechSynthesis.speak(
+                utterance
             );
 
         }
-
-        else {
-
-            setVoiceState(
-                "idle",
-                "Click Start Cherry to speak"
-            );
-        }
-    };
-
-
-    utterance.onerror =
-        event => {
-
-        error(
-            "Speech synthesis error:",
-            event
-        );
-
-
-        if (
-            shouldListen
-        ) {
-
-            setVoiceState(
-                "listening",
-                "Listening..."
-            );
-
-        }
-
-        else {
-
-            setVoiceState(
-                "idle",
-                "Click Start Cherry to speak"
-            );
-        }
-    };
-
-
-    speechSynthesis.speak(
-        utterance
     );
 }
+
+
+// ==========================================
+// PAGE LOAD
+// ==========================================
+
+setVoiceState(
+    "idle",
+    "Click Start Cherry to speak"
+);
