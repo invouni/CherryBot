@@ -8,7 +8,7 @@
 
 ## Live Demo
 
-> **Hosted URL:** `YOUR_HOSTED_URL_HERE`
+> **Hosted URL:** [Cherry Website](https://cherryai-juli.onrender.com)
 
 <!-- Replace the URL above when the project is hosted. -->
 
@@ -232,15 +232,9 @@ For the best experience:
 ## Screenshots
 
 Add screenshots of Cherry here.
+![Cherry TimeTable](./docs/ttable.png)
+![Cherry Screenshot](./docs/cherry.png)
 
-```text
-┌──────────────────────────────────────────────┐
-│                                              │
-│              ADD SCREENSHOT                  │
-│                                              │
-│                                              │
-└──────────────────────────────────────────────┘
-```
 
 ---
 
